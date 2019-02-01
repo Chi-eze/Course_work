@@ -378,10 +378,10 @@ resource "aws_elb" "prod" {
   subnets = ["${aws_subnet.private1.ids}", "${aws_subnet.private2.id}"]
   security_groups = ["${aws_security_group.public.id}"]
   listener {
-    instance_port = 80
+    instance_port = 8080
     instance_protocol = "http"
-    lb_port = 80
-    lb_protocol = "http"
+    lb_port = 443
+    lb_protocol = "https"
   }
   
   health_check {
@@ -406,17 +406,17 @@ resource "aws_elb" "prod" {
 
 resource "ramdom_id" "ami" {
   byte_length = 8
-  
-}
-resource "aws_aim_from_instance" "golden" {
+
+  }
+resource "aws_aim_from_instance" "black_gold" {
   name = "ami-${ramdom_id.ami.b64}"
   source_instance_id = "${aws_instance.dev.id}"
-  provisioner "local-exec"{
+  provisioner "local-exec" {
     command = "cat <<EOF > userdata
-    #!/bin/bash
-    /usr/bin/aws s3 sync s3://${aws_s3_buck.code.bucket} /var/www/html/
-    bin/tiouch /var/spool/cron/root
-    sudo /bin/echo '*/5 * * * * aws s3 sync s3:// ${aws_s3_bucket.code.bucket' /var/www/html/' >> /var/spool/cron/root
+   #!/bin/bash
+    /usr/bin/aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/
+    bin/touch /var/spool/cron/root
+    sudo /bin/echo '*/5 * * * * aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/' >> /var/spool/cron/root
     EOF"
 
 
