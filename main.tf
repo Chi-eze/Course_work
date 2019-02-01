@@ -238,21 +238,6 @@ resource "aws_security_group" "RDS" {
   }
 }
 
-#DB
-
-resource "aws_db_instance" "skies-db" {
-    allocated_storage   = 10
-    engine              = "mysql"
-    engine_version      =  "8.0"
-    instance_class      = "${var.db_instance_class_}"
-    name                = "${var.dbname}"
-    username            = "${var.dbuser}"
-    password            = "${var.dbpassword}"
-    db_subnet_group_name = "${aws_db_subnet_group.rds_subnetgroup.name}"
-    vpc_security_group_ids = "[${aws_security_group.RDS.id}]"
-
-
-}
 
 #Key Pair 
 # so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
@@ -342,6 +327,25 @@ resource  "aws_s3_bucket" "code" {
 }
 
 #Compute
+#DB
+
+resource "aws_db_instance" "skies-db" {
+    allocated_storage   = 10
+    engine              = "mysql"
+    engine_version      =  "8.0"
+    instance_class      = "${var.db_instance_class_}"
+    name                = "${var.dbname}"
+    username            = "${var.dbuser}"
+    password            = "${var.dbpassword}"
+    db_subnet_group_name = "${aws_db_subnet_group.rds_subnetgroup.name}"
+    vpc_security_group_ids = "[${aws_security_group.RDS.id}]"
+
+
+}
+
+
+
+
 
 #Dev Sever 
   # ansible play
