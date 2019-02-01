@@ -343,19 +343,173 @@ resource "aws_db_instance" "skies-db" {
 
 }
 
-
-
-
-
 #Dev Sever 
-  # ansible play
+
+resource "aws_instance"  "dev" {
+  instance_type = "${var.dev_instance_type}"
+  ami = "${var.dev_ami}"
+  tags {
+    name = "dev"
+  }
+  key_name = "${aws_key_pair.auth.id}"
+  vpc_security_group_ids ["${aws_security_group.public.id}"]
+  iam_instance_profile ="${aws_iam_instance_profile.s3_access.id}"
+  subnet_id = "${aws_subnet.public.id}"
+}
+
+provisioner "local-exec"{
+  command = "cat <<EOF > aws_hosts"
+  [dev]
+  ${aws_instance.dev.public_ip}
+  [dev:vars]
+  s3code=${aws_s3_bucket.code.bucket}
+  EOF
+}
+
+provisioner  "local-exec" {
+  command = "sleep 6m && ansible-playbook -i aws_hosts apache.yml"
+}
+ 
+  
+
 #Load balancer 
+resource "aws_elb" "prod" {
+  name = "${var.domain_name}-prod-elb"
+  subnets = ["${aws_subnet.private1.ids}", "${aws_subnet.private2.id}"]
+  security_groups = ["${aws_security_group.public.id}"]
+  listener {
+    instance_port = 80
+    instance_protocol = "http"
+    lb_port = 80
+    lb_protocol = "http"
+  }
+  
+  health_check {
+    healthy_threshold = "${var.elb_healthy_threshold}"
+    unhealthy_threshold ="${var.elb_unhealthy_threshold}"
+    timeout = "${var.elb_timeout}"
+    terget = "HTTP:80/"
+    internal = "${var.elb_interval}"
+  }
+  cross_zone_load_balancing = true
+  idle_timeout = 400
+  connection_draining = true
+  connection_draining_timeout = 400
+  tags{
+    name = "${var.domain_name}-prod-elb"
+
+  }
+}
+
+
 # AMI
-# Lunch configuration
+
+resource "ramdom_id" "ami" {
+  byte_length = 8
+  
+}
+resource "aws_aim_from_instance" "golden" {
+  name = "ami-${ramdom_id.ami.b64}"
+  source_instance_id = "${aws_instance.dev.id}"
+  provisioner "local-exec"{
+    command = "cat <<EOF > userdata
+    #!/bin/bash
+    /usr/bin/aws s3 sync s3://${aws_s3_buck.code.bucket} /var/www/html/
+    bin/tiouch /var/spool/cron/root
+    sudo /bin/echo '*/5 * * * * aws s3 sync s3:// ${aws_s3_bucket.code.bucket' /var/www/html/' >> /var/spool/cron/root
+    EOF"
+
+
+  }
+    
+}
+
+#Lunch configuration
+
+resource  "aws_lunch_configuration"  "lc" {
+  name_prefix = "lc"
+  image_id = "${aws_aim_from_instance.golden.id}"
+  instance_type = "${var.lc_instance_type}"
+  security_groups = ["${aws_security_group.private.id}"]
+  iam_instance_profile = "${aws_aim_instance_profile.s3_access.id}"
+  key_name = "${file("userdata")}"
+  lifecycle = {
+    create_before_destory = true
+
+  }
+}
+
+
 # Auto scaling group
 
+resource "aws_autoscaling_group" "asg" {
+  availability_zones = ["${var.aws_region}a", "${var.aws_region}c"]
+  name = "asg-${aws_lunch_configuration.lc.id}"
+  max_size = "${var.asg_max}"
+  min_size = "${var.asg_min}"
+  health_check_grace_period = "{var.asg_grace}"
+  health_check_type = "${var.asg_cap}"
+  force_delete =true
+  load_balancers = ["aws_elb.prod.id"]
+  vpc_zone_identifier = ["${aws_subnet.private.id}" ,"${aws_subnet.private2.id}" ]
+  lunch_configuration = "${aws_lunch_configuration.lc.name}"
+  tags{
+    key = "Name"
+    value = "asg-instance"
+    propagate_at_launch = true
+  }
+  lifescycle{
+    create_before_destory = true
+  }
+  
+}
+
+
 # Route53 
+
 # primary zone : use deligation set 
+resource " aws_route53" "primary" {
+  name = "var.domain_name".com
+  delegation_set_id = ""{var.delegation_set}
+  
+}
+
 #www point to load balancer 
+
+resource "aws_route53_record" "www" {
+  zone_id ="$aws_route53_zone.primary.zone_id"
+  name = "www".${var.domain_name}.com
+  type = "A"
+  alias {
+    name =  "${aws_elb.prod.dns_name}"
+    zone_id = "${aws_elb.prod.zone_id}"
+    evaluate_target_health = false
+
+  }
+  
+}
+
+
 #dev record to point to the dev server public IP address 
+
+resource "aws_route53_record" "dev" { 
+  zone_id = "${aws_route53_zone.primary.zone.id}"
+  name= "dev.${var.domain_name}.com"
+  type = "A"
+  ttl = "300"
+  records = ["$aws_instance.dev.public.ip"]
+}
+
+
 #db cname for RDS < allow web server to point to the RDs even if the IP changes 
+
+resource "aws_route53" "db" {
+  zone_id = "${aws_route53_zone.primary.zone_id}"
+  name = "db.${var.domain_name}.com"
+  type = "CNAME"
+  ttl = "300"
+  records = ["${aws_db_instance.db.address}"]
+  
+}
+
+# ansible play
