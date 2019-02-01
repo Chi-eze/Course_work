@@ -24,9 +24,9 @@ resource "aws_route_table"  " public" {
    vpc_id = "${ aws_vpc.skies_vpc.id }"
    route { 
           cidr_block = "0.0.0.0/0"
-          gateway_id = "{ aws_internet_gateway.skies_gateway.id }"
+          gateway_id = "{ aws_internet_gateway.skies_internet_gateway.id }"
     tags {
-          Name = "public"
+          Name = "skiespublic"
     }
    }
 }
@@ -35,12 +35,13 @@ resource "aws_route_table"  " public" {
 #Private route table
 
 resource  "aws_defualt_route_table "  "private" {
-  default_route_table_id = "${ aws_vpc.skies_vpc.defult_route_table.id }"
+  default_route_table_id = "${ aws_vpc.skies_vpc.defult_route_table_id }"
   tags {
-    Name = "private"
+    Name = "skies_private"
   }
 }
 #subnets
+
 #public subnet
  resource "aws_subnet" "public" {
    vpc_id ="${ aws_vpc.skies_vpc.id }"
@@ -48,7 +49,7 @@ resource  "aws_defualt_route_table "  "private" {
    map_public_ip_on_launch = true 
    availability_zone = "eu-west-1d"
    tags {
-     Name ="public"
+     Name ="skies_public"
    }
 
  }
@@ -61,7 +62,7 @@ resource "aws_subnet" " private1" {
   map_public_ip_on_launch = false
   availability_zone = "eu-west-1a"
   tags {
-    Name ="private1"
+    Name ="skies_private1"
   }
 # Private 2
 
@@ -72,7 +73,7 @@ resource "aws_subnet" " private2 " {
   availability_zone = "eu-west-1c"
 
   tags{
-    Name = "private2"
+    Name = "skies_private2"
   }
   
 }
@@ -113,8 +114,7 @@ resource "aws_subnet" "rds3" {
 
 
 
-# Associate subnet with routing tabel  >
-
+# < Associate subnet with routing tabel  >
 
 
 #Public
@@ -127,21 +127,21 @@ resource "aws_route_table_association" "public_assoc" {
   }
 }
 
-#Privgate 
+#Private 
 
 resource "aws_route_table_association" "private1_assoc" {
   subnet_id = "${ aws_subnet.private1.id}" 
-  route_table_id ="${ aws_route_table.private1.id}"
+  route_table_id ="${ aws_route_table.public.id}"
 
   tags {
-    Name = "skies_private1_route_table"
+    Name = "skies_private1_merge_public_route_table"
   }
   
 }
 
 resource "aws_route_table_association" "private2_assoc" {
   subnet_id = "${ aws_subnet.private2.id }"
-  route_table_id = "${ aws_route_table.private2.id }"
+  route_table_id = "${ aws_route_table.public.id }"
 
   tags {
     Name = " Skies_private1_route_table" 
@@ -156,7 +156,7 @@ resource "aws_db_subnet_group" "rds_subnetgroup" {
   subnet_ids = ["${ aws_subnet.rds1.id }" ,"${ aws_subnet.rds2.id }" ,"${ aws_subnet.rds3.id }"]
 
 tags {
-  Name = "rds_sng"
+  Name = "skies_rds_sng"
 }
   
 }
@@ -232,21 +232,117 @@ resource "aws_security_group" "RDS" {
     from_port = 3306
     to_port = 3306
     protocol = "tcp"
-   security_groups = ["${aws_security_group.public}" ,  "${ aws_security_group.private.id }"]
+    security_groups = ["${aws_security_group.public}" ,  "${ aws_security_group.private.id }"]
 
 
   }
 }
 
+#DB
 
-# Getting IAM 
-#s3_access
+resource "aws_db_instance" "skies-db" {
+    allocated_storage   = 10
+    engine              = "mysql"
+    engine_version      =  "8.0"
+    instance_class      = "${var.db_instance_class_}"
+    name                = "${var.dbname}"
+    username            = "${var.dbuser}"
+    password            = "${var.dbpassword}"
+    db_subnet_group_name = "${aws_db_subnet_group.rds_subnetgroup.name}"
+    vpc_security_group_ids = "[${aws_security_group.RDS.id}]"
 
+
+}
+
+#Key Pair 
+# so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
+#(Note: this will not upload the private key to your instances only the public so if yopu need to connect to one of your private instances from your public instance as a bashing host you will need to use
+# ssh -a  to forward the key agent or you will need to copy the private key to your host , ] )
+
+resource "aws_key_pair" "auth" {
+  key_name = "${var.key_name}"
+  key_path =  "${file(var.public_key_path)}"
+
+}
+
+#S3 Roles, s3_access
+
+resource "aws_iam_instance_profile" "s3_access" {
+  name = "s3_access"
+  roles = ["${aws_iam_role.s3_access.name}"]
+  
+}
+
+resource "aws_iam_role_policy" "s3_access_policy" {
+  name = "s3_access_policy"
+  role = "${aws_iam_role.s3_access.id}"
+  policy = <<EOF
+  {
+    "Version" : "2012-10-17",
+    "Statement" : [
+     {
+       "Effect" : "Allow",
+       "Action" : "s3:*",
+       "Resource": "*"
+     }
+    ]
+  }
+EOF
+}
+
+resource "aws_iam_role" "s3_access" {
+  name = "s3_access"
+  assume_role_policy = <<EOF
+  {
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Action" : "sts:AssumeRole",
+        "Principle" : {
+          "Services : "ec2.amazoneaws.com"
+        },   
+           "Effect" : "Allow",
+           "Sid" : ""
+
+              }
+    ]
+  }
+
+}
+
+#create S3 VPC endpoint 
+resource "aws_vpc_endpoint" "private-s3" {
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+  service_name = "com.amazoneaws.${var.aws_region}.s3"
+  route_table_ids = ["${aws_vpc.skies_vpc.main_route_table_id}" , "${aws_route_table.public.id}"]
+  policy = <<POLICY
+  {
+    "Statement" : [
+      {
+        "Action" : "*",
+        "Effect" : "Allow"
+        "Resource": "*"
+        "Principle" : "*"
+      }
+    ]
+  }
+  POLICY
+}
 
 #S3 Code Bucket
 
+resource  "aws_s3_bucket" "code" {
+  bucket = "$var.domain_name"_code0909
+  acl = "private"
+   # this allows terraform to distory the bucket even with content 
+  force_destory = true
+  tags {
+    Name = "code bucket"
+  }
+}
+
 #Compute
-#Key Pair 
+
 #Dev Sever 
   # ansible play
 #Load balancer 
