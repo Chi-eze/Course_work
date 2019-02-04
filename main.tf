@@ -317,7 +317,7 @@ resource "aws_vpc_endpoint" "private-s3" {
 #S3 Code Bucket
 
 resource  "aws_s3_bucket" "code" {
-  bucket = "$var.domain_name"_code0909
+  bucket = "${var.domain_name}_code1115
   acl = "private"
    # this allows terraform to distory the bucket even with content 
   force_destory = true
@@ -408,20 +408,20 @@ resource "ramdom_id" "ami" {
   byte_length = 8
 
   }
-resource "aws_aim_from_instance" "black_gold" {
-  name = "ami-${ramdom_id.ami.b64}"
-  source_instance_id = "${aws_instance.dev.id}"
+resource "aws_ami_from_instance" "wp_golden" {
+  name               = "wp_ami-${random_id.golden_ami.b64}"
+  source_instance_id = "${aws_instance.wp_dev.id}"
+
   provisioner "local-exec" {
-    command = "cat <<EOF > userdata
-   #!/bin/bash
-    /usr/bin/aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/
-    bin/touch /var/spool/cron/root
-    sudo /bin/echo '*/5 * * * * aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/' >> /var/spool/cron/root
-    EOF"
-
-
+    command = <<EOT
+cat <<EOF > userdata
+#!/bin/bash
+/usr/bin/aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/
+/bin/touch /var/spool/cron/root
+sudo /bin/echo '*/5 * * * * aws s3 sync s3://${aws_s3_bucket.code.bucket} /var/www/html/' >> /var/spool/cron/root
+EOF
+EOT
   }
-    
 }
 
 #Lunch configuration
@@ -489,7 +489,6 @@ resource "aws_route53_record" "www" {
   
 }
 
-
 #dev record to point to the dev server public IP address 
 
 resource "aws_route53_record" "dev" { 
@@ -512,4 +511,4 @@ resource "aws_route53" "db" {
   
 }
 
-# ansible play
+# ansible playbook
