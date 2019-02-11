@@ -50,148 +50,149 @@ EOF
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#VPC 
+#-----VPC------ 
 
 resource "aws_vpc" "skies_vpc" {
-  cider_block = " 10.1.0.0.16/16"
+  cidr_block = "${var.vpc_cidr}"
+  enable_dns_hostnames = true
+  enable_dns_support = true
+  tags{
+    Name = "Sky_VPC"
+
+  }
 }
 
 # Internet Gate way
 
 resource "aws_internet_gateway" "skies_internet_gateway" {
-  vpc_id = "${ aws_vpc.skies_vpc.id }"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+}
+tags {
+  Name = "Sky_igw"
 }
 #Public route table
 
-resource "aws_route_table"  " public" {
-
+resource "aws_route_table" "public_rt" {
    vpc_id = "${aws_vpc.skies_vpc.id}"
    route { 
           cidr_block = "0.0.0.0/0"
-          gateway_id = "{ aws_internet_gateway.skies_internet_gateway.id }"
-    tags {
-          Name = "skiespublic"
-    }
+          gateway_id = "${aws_internet_gateway.skies_internet_gateway.id}"
    }
+    tags {
+          Name = "skyPublic"
+    }
 }
 
-
-
-
 #Private route table
-
-resource  "aws_defualt_route_table "  "private" {
+resource  "aws_defualt_route_table"  "private_rt" {
   default_route_table_id = "${aws_vpc.skies_vpc.defult_route_table_id}"
   tags {
-    Name = "ski_Proute"
+    Name = "Sky_Private"
   }
 }
 #subnets
 
-#public subnet
- resource "aws_subnet" "public" {
+#----------public subnet------------
+ resource "aws_subnet" "skies_public1_subnet" {
    vpc_id ="${aws_vpc.skies_vpc.id}"
-   cidr_block = " 10.1.1.0/24 "
+   cidr_block = "${var.cidrs["public1"]}"
    map_public_ip_on_launch = true 
-   availability_zone = "eu-west-1d"
+   availability_zone = "eu-west-1a"
    tags {
-     Name ="skies_public"
+     Name ="sky_public1"
    }
 
  }
 
+resource "aws_subnet"  "skies_public2_subnet"{
+  cidr_block = "${var.cidrs["public2"]}"
+  map_public_ip_on_launch = true
+  availability_zone = "eu-west-1b"
+  tags {
+    Name = "sky_public2"
+  }
+}
+
+
 #Private 1
 
-resource "aws_subnet" " private1" {
+resource "aws_subnet" " skies_private1_subnet" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
-  cidr_block = "10.1.2.0/24"
+  cidr_block = "${var.cidrs["private1"]}"
   map_public_ip_on_launch = false
-  availability_zone = "eu-west-1a"
+  availability_zone = "eu-west-1c"
   tags {
-    Name ="skies_private1"
+    Name ="Sky_private1"
   }
 }
 # Private 2
 
-resource "aws_subnet" " private2 " {
-  vpc_id ="${ aws_vpc.skies_vpc.id }"
-  cider_block = " 10.0.1.3.0/24"
+resource "aws_subnet" "skies_private2_subnet" {
+  vpc_id ="${aws_vpc.skies_vpc.id}"
+  cider_block = "${var.cidrs["private2"]}"
   map_public_ip_on_launch = false
-  availability_zone = "eu-west-1c"
-
+  availability_zone = "eu-west-1a"
   tags{
-    Name = "skies_private2"
+    Name = "sky_private2"
   }
   
 }
  
 
-# RDS sub net group < RDS-1 RDS -2 RDS -3 >
+#------- RDS sub net group  RDS-1 RDS -2 RDS -3 -------
 
-resource "aws_subnet" "rds1" {
-  vpc_id = "${ aws_vpc.skies_vpc.id }"
-  cidr_block = "10.1.4.0/24"
+resource "aws_subnet" "skies_rds1_subnet" {
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+  cidr_block = "${var.cidrs[rds1]}"
   map_public_ip_on_launch = false
   availability_zone = "eu-west-1a"
 
   tags {
-    Name = "rds1"
+    Name = "Sky_rds1_Subnet"
     }
 }
 
 #RDS -2
-resource "aws_subnet" " rds2" {
-  vpc_id = "${ aws_vpc.skies_vpc.id }"
-  cidr_block = " 10.0.5.0/24"
+resource "aws_subnet" "skies_rds2_subnet" {
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+  cidr_block = "${var.cidrs["rds2"]}"
   map_public_ip_on_launch = false
-  availability_zone = "eu-west-1c"
+  availability_zone = "eu-west-1b"
 
   tags {
-    Name = "rds2"
+    Name = "Sky_rds2_subnet"
   }
 }
 #RDS -3
 
-resource "aws_subnet" "rds3" {
-  vpc_id = "${ aws_vpc.skies_vpc.id }"
+resource "aws_subnet" "skies_rds3_subnet" {
+  vpc_id = "${aws_vpc.skies_vpc.id}"
   cider_block = "10.0.1.6.0/24"
   map_public_ip_on_launch = false
   availability_zone = "eu-west-1d"
+  tags {
+    Name = "Sky_rds2_subnet"
+  }
 }
 
+#-----RDS Subnet Group -------
 
+resource "aws_db_subnet_group" "skies_rds_subnetgroup" {
+  name = "skies_rds_subnetgroup"
+  subnet_ids = ["${aws_subnet.skies_rds1_subnet.id}","${aws_subnet.skies_rds2_subnet.id}","${aws_subnet.skies_rds3_subnet.id}"]
+tags {
+  Name = "Sky_rds_sng"
+}
+  
+}
 
-# < Associate subnet with routing tabel  >
+# <---------- Associate subnet with routing tabel --------- >
 
 
 #Public
-resource "aws_route_table_association" "public_assoc" {
-  subnet_id = "${aws_subnet.public.id}" 
-  route_table_id ="${aws_route_table.public.id}"
+resource "aws_route_table_association" "Skies_public_assoc" {
+  subnet_id = "${aws_subnet.skies_public1_subnet.id}" 
+  route_table_id = "${aws_route_table.public.id}"
 
   tags{
     Name = "skies_public_route_table"
@@ -201,8 +202,8 @@ resource "aws_route_table_association" "public_assoc" {
 #Private 
 
 resource "aws_route_table_association" "private1_assoc" {
-  subnet_id = "${ aws_subnet.private1.id}" 
-  route_table_id ="${ aws_route_table.public.id}"
+  subnet_id = "${aws_subnet.private1.id}" 
+  route_table_id ="${aws_route_table.public.id}"
 
   tags {
     Name = "skies_private1_merge_public_route_table"
@@ -218,17 +219,6 @@ resource "aws_route_table_association" "private2_assoc" {
     Name = " Skies_private1_route_table" 
 
   }
-  
-}
-
-resource "aws_db_subnet_group" "rds_subnetgroup" {
-
-  name = "rds_subnetgroup"
-  subnet_ids = ["${ aws_subnet.rds1.id }" ,"${ aws_subnet.rds2.id }" ,"${ aws_subnet.rds3.id }"]
-
-tags {
-  Name = "skies_rds_sng"
-}
   
 }
 

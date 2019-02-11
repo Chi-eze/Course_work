@@ -25,3 +25,8 @@ variable  "asg_hct" {}
  variable  "asg_cap" {}
  variable  "lc_instance_type" {}
  variable "delegation_set" {}
+##data "aws_availability_zones" "available" {}
+variable "vpc_cidr" {}
+variable "cidrs"{
+    type = "map"
+}
