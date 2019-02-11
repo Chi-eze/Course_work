@@ -469,7 +469,7 @@ resource "aws_autoscaling_group" "asg" {
 
 # primary zone : use deligation set 
 resource " aws_route53" "primary" {
-  name = "var.domain_name".com
+  name = "var.domain_name".co.uk
   delegation_set_id = ""{var.delegation_set}
   
 }
@@ -478,7 +478,7 @@ resource " aws_route53" "primary" {
 
 resource "aws_route53_record" "www" {
   zone_id ="$aws_route53_zone.primary.zone_id"
-  name = "www".${var.domain_name}.com
+  name = "www".${var.domain_name}.co.uk
   type = "A"
   alias {
     name =  "${aws_elb.prod.dns_name}"
@@ -504,7 +504,7 @@ resource "aws_route53_record" "dev" {
 
 resource "aws_route53" "db" {
   zone_id = "${aws_route53_zone.primary.zone_id}"
-  name = "db.${var.domain_name}.com"
+  name = "db.${var.domain_name}.co.uk"
   type = "CNAME"
   ttl = "300"
   records = ["${aws_db_instance.db.address}"]
