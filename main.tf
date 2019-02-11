@@ -1,8 +1,76 @@
 provider "aws" {
-  region = "${ var.aws_region}"
-  profile = "${ var.aws_profile }"
-
+  region  = "${var.aws_region}"
+  profile = "${var.aws_profile}"
 }
+
+##----IAM----Role
+
+#S3 Roles, s3_access
+
+resource "aws_iam_instance_profile" "s3_access_profile" {
+  name = "s3_access"
+  role = "${aws_iam_role.s3_access_role.name}"
+  }
+
+resource "aws_iam_role_policy" "s3_access_policy" {
+  name = "s3_access_policy"
+  role = "${aws_iam_role.s3_access_role.id}"
+  policy = <<EOF
+  {
+    "Version" : "2012-10-17",
+    "Statement" : [
+     {
+       "Effect" : "Allow",
+       "Action" : "s3:*",
+       "Resource": "*"
+     }
+    ]
+  }
+EOF
+}
+
+resource "aws_iam_role" "s3_access_role" {
+  name = "s3_access_role"
+  assume_role_policy = <<EOF
+  {
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Action" : "sts:AssumeRole",
+        "Principle" : {
+          "Services : "ec2.amazoneaws.com"
+        },   
+           "Effect" : "Allow",
+           "Sid" : ""
+
+           }
+    ]
+  }
+EOF
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -21,7 +89,7 @@ resource "aws_internet_gateway" "skies_internet_gateway" {
 
 resource "aws_route_table"  " public" {
 
-   vpc_id = "${ aws_vpc.skies_vpc.id }"
+   vpc_id = "${aws_vpc.skies_vpc.id}"
    route { 
           cidr_block = "0.0.0.0/0"
           gateway_id = "{ aws_internet_gateway.skies_internet_gateway.id }"
@@ -32,19 +100,21 @@ resource "aws_route_table"  " public" {
 }
 
 
+
+
 #Private route table
 
 resource  "aws_defualt_route_table "  "private" {
-  default_route_table_id = "${ aws_vpc.skies_vpc.defult_route_table_id }"
+  default_route_table_id = "${aws_vpc.skies_vpc.defult_route_table_id}"
   tags {
-    Name = "skies_private"
+    Name = "ski_Proute"
   }
 }
 #subnets
 
 #public subnet
  resource "aws_subnet" "public" {
-   vpc_id ="${ aws_vpc.skies_vpc.id }"
+   vpc_id ="${aws_vpc.skies_vpc.id}"
    cidr_block = " 10.1.1.0/24 "
    map_public_ip_on_launch = true 
    availability_zone = "eu-west-1d"
@@ -57,13 +127,14 @@ resource  "aws_defualt_route_table "  "private" {
 #Private 1
 
 resource "aws_subnet" " private1" {
-  vpc_id = "${ aws_vpc.skies_vpc.id}"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
   cidr_block = "10.1.2.0/24"
   map_public_ip_on_launch = false
   availability_zone = "eu-west-1a"
   tags {
     Name ="skies_private1"
   }
+}
 # Private 2
 
 resource "aws_subnet" " private2 " {
@@ -119,8 +190,8 @@ resource "aws_subnet" "rds3" {
 
 #Public
 resource "aws_route_table_association" "public_assoc" {
-  subnet_id = "${ aws_subnet.public}" 
-  route_table_id ="${ aws_route_table.public.id }"
+  subnet_id = "${aws_subnet.public.id}" 
+  route_table_id ="${aws_route_table.public.id}"
 
   tags{
     Name = "skies_public_route_table"
@@ -232,7 +303,7 @@ resource "aws_security_group" "RDS" {
     from_port = 3306
     to_port = 3306
     protocol = "tcp"
-    security_groups = ["${aws_security_group.public}" ,  "${ aws_security_group.private.id }"]
+    security_groups = ["${aws_security_group.public.id}" , "${ aws_security_group.private.id }"]
 
 
   }
@@ -250,50 +321,6 @@ resource "aws_key_pair" "auth" {
 
 }
 
-#S3 Roles, s3_access
-
-resource "aws_iam_instance_profile" "s3_access" {
-  name = "s3_access"
-  roles = ["${aws_iam_role.s3_access.name}"]
-  
-}
-
-resource "aws_iam_role_policy" "s3_access_policy" {
-  name = "s3_access_policy"
-  role = "${aws_iam_role.s3_access.id}"
-  policy = <<EOF
-  {
-    "Version" : "2012-10-17",
-    "Statement" : [
-     {
-       "Effect" : "Allow",
-       "Action" : "s3:*",
-       "Resource": "*"
-     }
-    ]
-  }
-EOF
-}
-
-resource "aws_iam_role" "s3_access" {
-  name = "s3_access"
-  assume_role_policy = <<EOF
-  {
-    "Version" : "2012-10-17",
-    "Statement" : [
-      {
-        "Action" : "sts:AssumeRole",
-        "Principle" : {
-          "Services : "ec2.amazoneaws.com"
-        },   
-           "Effect" : "Allow",
-           "Sid" : ""
-
-              }
-    ]
-  }
-
-}
 
 #create S3 VPC endpoint 
 resource "aws_vpc_endpoint" "private-s3" {
@@ -317,7 +344,7 @@ resource "aws_vpc_endpoint" "private-s3" {
 #S3 Code Bucket
 
 resource  "aws_s3_bucket" "code" {
-  bucket = "${var.domain_name}_code1115
+  bucket = "${var.domain_name}_code1115"
   acl = "private"
    # this allows terraform to distory the bucket even with content 
   force_destory = true
@@ -352,18 +379,20 @@ resource "aws_instance"  "dev" {
     name = "dev"
   }
   key_name = "${aws_key_pair.auth.id}"
-  vpc_security_group_ids ["${aws_security_group.public.id}"]
-  iam_instance_profile ="${aws_iam_instance_profile.s3_access.id}"
+  vpc_security_group_ids= ["${aws_security_group.public.id}"]
+  iam_instance_profile  ="${aws_iam_instance_profile.s3_access.id}"
   subnet_id = "${aws_subnet.public.id}"
 }
 
 provisioner "local-exec"{
-  command = "cat <<EOF > aws_hosts"
+  command = <<EOD
+  cat <<EOF > aws_hosts
   [dev]
   ${aws_instance.dev.public_ip}
   [dev:vars]
   s3code=${aws_s3_bucket.code.bucket}
   EOF
+  EOD
 }
 
 provisioner  "local-exec" {
@@ -469,16 +498,14 @@ resource "aws_autoscaling_group" "asg" {
 
 # primary zone : use deligation set 
 resource " aws_route53" "primary" {
-  name = "var.domain_name".co.uk
-  delegation_set_id = ""{var.delegation_set}
-  
+  name = "${var.domain_name}.co.uk"
+  delegation_set_id = "{var.delegation_set}"
 }
-
 #www point to load balancer 
 
 resource "aws_route53_record" "www" {
-  zone_id ="$aws_route53_zone.primary.zone_id"
-  name = "www".${var.domain_name}.co.uk
+  zone_id ="${aws_route53_zone.primary.zone_id}"
+  name = "www.${var.domain_name}.co.uk"
   type = "A"
   alias {
     name =  "${aws_elb.prod.dns_name}"
