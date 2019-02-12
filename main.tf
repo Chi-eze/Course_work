@@ -50,7 +50,7 @@ EOF
 }
 
 
-#-----VPC------ 
+#-------------VPC------------
 
 resource "aws_vpc" "skies_vpc" {
   cidr_block = "${var.vpc_cidr}"
@@ -62,7 +62,7 @@ resource "aws_vpc" "skies_vpc" {
   }
 }
 
-# Internet Gate way
+#--------- Internet Gate way---------
 
 resource "aws_internet_gateway" "skies_internet_gateway" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
@@ -70,27 +70,27 @@ resource "aws_internet_gateway" "skies_internet_gateway" {
 tags {
   Name = "Sky_igw"
 }
-#Public route table
+#-----------Public route table-----------------------
 
-resource "aws_route_table" "public_rt" {
+resource "aws_route_table" "skies_public_rt" {
    vpc_id = "${aws_vpc.skies_vpc.id}"
    route { 
           cidr_block = "0.0.0.0/0"
           gateway_id = "${aws_internet_gateway.skies_internet_gateway.id}"
    }
     tags {
-          Name = "skyPublic"
+          Name = "sky_Public"
     }
 }
 
-#Private route table
-resource  "aws_defualt_route_table"  "private_rt" {
+#------------------Private Route table-------------------
+resource  "aws_defualt_route_table"  "skies_private_rt" {
   default_route_table_id = "${aws_vpc.skies_vpc.defult_route_table_id}"
   tags {
     Name = "Sky_Private"
   }
 }
-#subnets
+#Subnets
 
 #----------public subnet------------
  resource "aws_subnet" "skies_public1_subnet" {
@@ -99,7 +99,7 @@ resource  "aws_defualt_route_table"  "private_rt" {
    map_public_ip_on_launch = true 
    availability_zone = "eu-west-1a"
    tags {
-     Name ="sky_public1"
+     Name ="Sky_public1"
    }
 
  }
@@ -114,7 +114,7 @@ resource "aws_subnet"  "skies_public2_subnet"{
 }
 
 
-#Private 1
+#---------------Private 1----------------------
 
 resource "aws_subnet" " skies_private1_subnet" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
@@ -125,7 +125,7 @@ resource "aws_subnet" " skies_private1_subnet" {
     Name ="Sky_private1"
   }
 }
-# Private 2
+# -------------------Private 2---------------------
 
 resource "aws_subnet" "skies_private2_subnet" {
   vpc_id ="${aws_vpc.skies_vpc.id}"
@@ -139,7 +139,8 @@ resource "aws_subnet" "skies_private2_subnet" {
 }
  
 
-#------- RDS sub net group  RDS-1 RDS -2 RDS -3 -------
+#RDS sub net group  RDS-1 RDS -2 RDS -3 
+#--------------RDS-1---------------------
 
 resource "aws_subnet" "skies_rds1_subnet" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
@@ -152,7 +153,7 @@ resource "aws_subnet" "skies_rds1_subnet" {
     }
 }
 
-#RDS -2
+#-----------------------RDS -2--------------------
 resource "aws_subnet" "skies_rds2_subnet" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
   cidr_block = "${var.cidrs["rds2"]}"
@@ -163,7 +164,7 @@ resource "aws_subnet" "skies_rds2_subnet" {
     Name = "Sky_rds2_subnet"
   }
 }
-#RDS -3
+#-------------------RDS -3-----------------------
 
 resource "aws_subnet" "skies_rds3_subnet" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
@@ -175,48 +176,60 @@ resource "aws_subnet" "skies_rds3_subnet" {
   }
 }
 
-#-----RDS Subnet Group -------
+#------------RDS Subnet Group -------
 
 resource "aws_db_subnet_group" "skies_rds_subnetgroup" {
   name = "skies_rds_subnetgroup"
   subnet_ids = ["${aws_subnet.skies_rds1_subnet.id}","${aws_subnet.skies_rds2_subnet.id}","${aws_subnet.skies_rds3_subnet.id}"]
 tags {
+
   Name = "Sky_rds_sng"
 }
   
 }
 
-# <---------- Associate subnet with routing tabel --------- >
+# < Associate subnet with routing tabel >
 
 
-#Public
-resource "aws_route_table_association" "Skies_public_assoc" {
+#-------------Public1 association-------------
+resource "aws_route_table_association" "skies_public1_assoc" {
   subnet_id = "${aws_subnet.skies_public1_subnet.id}" 
-  route_table_id = "${aws_route_table.public.id}"
-
+  route_table_id = "${aws_route_table.skies_public_rt.id}"
   tags{
-    Name = "skies_public_route_table"
+
+    Name = "sky_pub1_sub_prt_assoc"
   }
 }
 
-#Private 
+#----------------Public2- association------------------
+resource "aws_route_table_association" "skies_public2_assoc" {
+  subnet_id = "${aws_subnet.skies_public2_subnet.id}"
+  route_table_id = "${aws_route_table.skies_public_rt.id}"
+  
+}
 
-resource "aws_route_table_association" "private1_assoc" {
-  subnet_id = "${aws_subnet.private1.id}" 
-  route_table_id ="${aws_route_table.public.id}"
+
+
+#Private association
+
+#----------------------private1-------------------
+
+resource "aws_route_table_association" "skies_private1_assoc" {
+  subnet_id = "${aws_subnet.skies_private1_subnet.id}" 
+  route_table_id = "${aws_defualt_route_table.skies_private_rt.id}"
 
   tags {
-    Name = "skies_private1_merge_public_route_table"
+    Name = "sky_pri1_sub_pvrt_assoc"
   }
   
 }
 
-resource "aws_route_table_association" "private2_assoc" {
-  subnet_id = "${ aws_subnet.private2.id }"
-  route_table_id = "${ aws_route_table.public.id }"
+resource "aws_route_table_association" "skies_private2_assoc" {
+  subnet_id = "${aws_subnet.skies_private2_subnet.id}"
+  route_table_id = "${aws_defualt_route_table.skies_private_rt.id}"
 
   tags {
-    Name = " Skies_private1_route_table" 
+    Name = "sky_pri2_sub_pvrt_assoc" 
 
   }
   
@@ -224,190 +237,167 @@ resource "aws_route_table_association" "private2_assoc" {
 
 # Security Group
 
-resource  "aws_security_group" "public" {
-  name = "sg_public"
-  description = "used for both private and public instances for load balancer access "
-  vpc_id = "${ aws_vpc.skies_vpc.id }"
-  #SSH
-  ingress {
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
-    cidr_blocks = [ "${ var.localip }" ]
-  }
+#-----------------skies-dev--------------------
 
+resource "aws_security_group" "skies_dev_sg" {
+  name = "skies_dev_sg"
+  description = "used to access the dev instance"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+ #SSH
+ ingress {
+   from_port = 22
+   to_port = 22
+   protocol = "tcp"
+   cidr_blocks = ["${var.localip}"]
+ } 
+#HTTP
+ingress {
+  from_port = 80
+  to_port = 80
+  protocol =  "tcp"
+  cidr_blocks = ["${var.localip}"]
+}
+
+egress {
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+}
+}
+
+
+resource  "aws_security_group" "skies_public_sg" {
+  name = "sg_public"
+  description = "used for the ELB for public access"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
 # HTTP
   ingress {
     from_port = 80
     to_port = 80
     protocol = "tcp"
-    cider_blocks =  [ "0.0.0.0/0 "]
-    
+    cider_blocks = ["0.0.0.0/0"]
+  }
     egress {
       from_port = 0
       to_port = 0
       protocol = "-1"
-      cidr_blocks = [ "0.0.0.0/0" ]
-    }
-
-  }
+      cidr_blocks = ["0.0.0.0/0"]
+   }
 
 }
   
 # Private security Group
 
-resource "aws_security_group" "private" {
+resource "aws_security_group" "skies_private_sg" {
   name = "sg_private"
   description = "used for private instances"
-  vpc_id = "$ { aws_vpc.skies_vpc.id }"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
 
-  # Acess from other security group
-
+  # Access from VPC
   ingress {
     from_port = 0
     to_port = 0
     protocol = "-1"
-    cidr_blocks = ["10.1.0.0/16"] 
+    cidr_blocks = ["${var.vpc_cidr}"] 
   }
-
   egress {
     from_port = 0
     to_port = 0
     protocol = "-1"
-    cidr_blocks = [ "0.0.0.0 /0 "]
+    cidr_blocks = ["0.0.0.0 /0"]
   }
 
 }
   
 #RDS security Group
 
+resource "aws_security_group" "skies_rds_sg" {
+  name = "skies_sg_rds"
+  description = "used for RDS instances"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
 
-resource "aws_security_group" "RDS" {
-  name = "sg_rds"
-  description = "used for DB instances"
-  vpc_id = "${ aws_vpc.skies_vpc.id}"
-
-  #SQL access from public / private security group
+  #SQL access from public/private security group
 
   ingress {
     from_port = 3306
     to_port = 3306
     protocol = "tcp"
-    security_groups = ["${aws_security_group.public.id}" , "${ aws_security_group.private.id }"]
-
-
+    security_groups = ["${aws_security_group.skies_dev_sg.id}","${aws_security_group.skies_public_sg.id}","${aws_security_group.skies_private_sg}"]
   }
 }
 
-
-#Key Pair 
-# so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
-#(Note: this will not upload the private key to your instances only the public so if yopu need to connect to one of your private instances from your public instance as a bashing host you will need to use
-# ssh -a  to forward the key agent or you will need to copy the private key to your host , ] )
-
-resource "aws_key_pair" "auth" {
-  key_name = "${var.key_name}"
-  key_path =  "${file(var.public_key_path)}"
-
-}
-
-
-#create S3 VPC endpoint 
-resource "aws_vpc_endpoint" "private-s3" {
+#----------------create S3 VPC endpoint---------------------
+resource "aws_vpc_endpoint" "skies_private-s3_endpoint" {
   vpc_id = "${aws_vpc.skies_vpc.id}"
-  service_name = "com.amazoneaws.${var.aws_region}.s3"
-  route_table_ids = ["${aws_vpc.skies_vpc.main_route_table_id}" , "${aws_route_table.public.id}"]
+  service_name = "com.amazonaws.${var.aws_region}.s3"
+  route_table_ids = ["${aws_vpc.skies_vpc.main_route_table_id}","${aws_route_table.skies_public_rt.id}"]
   policy = <<POLICY
   {
     "Statement" : [
       {
-        "Action" : "*",
-        "Effect" : "Allow"
+        "Action": "*",
+        "Effect": "Allow"
         "Resource": "*"
-        "Principle" : "*"
+        "Principle": "*"
       }
     ]
   }
   POLICY
 }
 
-#S3 Code Bucket
+#--------------------S3 Code Bucket-----------------
+
+resource "ramdom_id" "skies_code_bucket" {
+  byte_length = 2 
+  }
 
 resource  "aws_s3_bucket" "code" {
-  bucket = "${var.domain_name}_code1115"
+  bucket = "${var.domain_name}-${ramdom_id.skies_code_bucket.dec}"
   acl = "private"
    # this allows terraform to distory the bucket even with content 
   force_destory = true
   tags {
-    Name = "code bucket"
+    Name = "Sky_Code bucket"
   }
 }
 
-#Compute
-#DB
 
-resource "aws_db_instance" "skies-db" {
+#--------------------RDS------------------------------
+
+resource "aws_db_instance" "skies_db" {
     allocated_storage   = 10
     engine              = "mysql"
     engine_version      =  "8.0"
-    instance_class      = "${var.db_instance_class_}"
+    instance_class      = "${var.db_instance_class}"
     name                = "${var.dbname}"
     username            = "${var.dbuser}"
     password            = "${var.dbpassword}"
-    db_subnet_group_name = "${aws_db_subnet_group.rds_subnetgroup.name}"
-    vpc_security_group_ids = "[${aws_security_group.RDS.id}]"
-
+    db_subnet_group_name = "${aws_db_subnet_group.skies_rds_subnetgroup.name}"
+    vpc_security_group_ids = ["${aws_security_group.skies_rds_sg.id}"]
+    skip_final_snapshot = true
 
 }
 
-#Dev Sever 
 
-resource "aws_instance"  "dev" {
-  instance_type = "${var.dev_instance_type}"
-  ami = "${var.dev_ami}"
-  tags {
-    name = "dev"
-  }
-  key_name = "${aws_key_pair.auth.id}"
-  vpc_security_group_ids= ["${aws_security_group.public.id}"]
-  iam_instance_profile  ="${aws_iam_instance_profile.s3_access.id}"
-  subnet_id = "${aws_subnet.public.id}"
-}
-
-provisioner "local-exec"{
-  command = <<EOD
-  cat <<EOF > aws_hosts
-  [dev]
-  ${aws_instance.dev.public_ip}
-  [dev:vars]
-  s3code=${aws_s3_bucket.code.bucket}
-  EOF
-  EOD
-}
-
-provisioner  "local-exec" {
-  command = "sleep 6m && ansible-playbook -i aws_hosts apache.yml"
-}
- 
-  
 
 #Load balancer 
-resource "aws_elb" "prod" {
-  name = "${var.domain_name}-prod-elb"
-  subnets = ["${aws_subnet.private1.ids}", "${aws_subnet.private2.id}"]
-  security_groups = ["${aws_security_group.public.id}"]
+resource "aws_elb" "skies_elb" {
+  name = "${var.domain_name}-elb"
+  subnets = ["${aws_subnet.skies_public1_subnet.ids}","${aws_subnet.skies_public2_subnet.ids}"]
+  security_groups = ["${aws_security_group.skies_public_sg.id}"]
   listener {
-    instance_port = 8080
+    instance_port = 80
     instance_protocol = "http"
-    lb_port = 443
+    lb_port = 80
     lb_protocol = "https"
   }
   
   health_check {
     healthy_threshold = "${var.elb_healthy_threshold}"
-    unhealthy_threshold ="${var.elb_unhealthy_threshold}"
+    unhealthy_threshold = "${var.elb_unhealthy_threshold}"
     timeout = "${var.elb_timeout}"
-    terget = "HTTP:80/"
+    target = "HTTP:80"
     internal = "${var.elb_interval}"
   }
   cross_zone_load_balancing = true
@@ -415,22 +405,68 @@ resource "aws_elb" "prod" {
   connection_draining = true
   connection_draining_timeout = 400
   tags{
-    name = "${var.domain_name}-prod-elb"
+    name = "Sky_${var.domain_name}-elb"
 
   }
 }
 
 
-# AMI
+##Key Pair 
 
-resource "ramdom_id" "ami" {
-  byte_length = 8
+#--------------Key_Pair----------
+
+resource "aws_key_pair" "skies_auth" {
+  key_name = "${var.key_name}"
+  public_key =  "${file(var.public_key_path)}"
+}
+
+
+#Compute
+
+#--------------------Dev Sever -------------------------
+
+resource "aws_instance"  "skies_dev" {
+  instance_type = "${var.dev_instance_type}"
+  ami = "${var.dev_ami}"
+  tags {
+    Name = "Sky_dev"
+  }
+  key_name = "${aws_key_pair.skies_auth.id}"
+  vpc_security_group_ids = ["${aws_security_group.skies_dev_sg.id}"]
+  iam_instance_profile  = "${aws_iam_instance_profile.s3_access.id}"
+  subnet_id = "${aws_subnet.skies_public1_subnet.id}"
+
+  provisioner "local-exec"{
+  command = <<EOD
+  cat <<EOF > aws_hosts
+  [dev]
+  ${aws_instance.skies_dev.public_ip}
+  [dev:vars]
+  s3code=${aws_s3_bucket.code.bucket}
+  domain=${var.domain_name}
+  EOF
+  EOD
+}
+provisioner  "local-exec" {
+  command = "aws ec2 wait instance-status-ok --instance-ids ${aws_instance.skies_dev.id} --profile podosky && ansible-playbook -i aws_hosts apache.yml"
+}
+ 
+}
+
+#Ramdom
+
+#--------------Ramdom-ami---------------------
+
+resource "ramdom_id" "gold_ami" {
+  byte_length = 3
 
   }
-resource "aws_ami_from_instance" "wp_golden" {
-  name               = "wp_ami-${random_id.golden_ami.b64}"
-  source_instance_id = "${aws_instance.wp_dev.id}"
 
+  ### AMI
+  #--------------Gold ami---------------------
+resource "aws_ami_from_instance" "skies_gold" {
+  name               = "skies_ami-${random_id.gold_ami.b64}"
+  source_instance_id = "${aws_instance.skies_dev.id}"
   provisioner "local-exec" {
     command = <<EOT
 cat <<EOF > userdata
@@ -442,6 +478,43 @@ EOF
 EOT
   }
 }
+
+
+
+#dev record to point to the dev server public IP address 
+
+resource "aws_route53_record" "dev" { 
+  zone_id = "${aws_route53_zone.primary.zone.id}"
+  name= "dev.${var.domain_name}.com"
+  type = "A"
+  ttl = "300"
+  records = ["$aws_instance.dev.public.ip"]
+}
+
+
+#Key Pair 
+# so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
+#(Note: this will not upload the private key to your instances only the public so if yopu need to connect to one of your private instances from your public instance as a bashing host you will need to use
+# ssh -a  to forward the key agent or you will need to copy the private key to your host , ] )
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
 
 #Lunch configuration
 
@@ -504,16 +577,6 @@ resource "aws_route53_record" "www" {
 
   }
   
-}
-
-#dev record to point to the dev server public IP address 
-
-resource "aws_route53_record" "dev" { 
-  zone_id = "${aws_route53_zone.primary.zone.id}"
-  name= "dev.${var.domain_name}.com"
-  type = "A"
-  ttl = "300"
-  records = ["$aws_instance.dev.public.ip"]
 }
 
 
