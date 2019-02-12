@@ -413,7 +413,11 @@ resource "aws_elb" "skies_elb" {
 
 ##Key Pair 
 
-#--------------Key_Pair----------
+#<<--------------Key_Pair---------->>
+
+# so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
+#(Note: this will not upload the private key to your instances only the public so if yopu need to connect to one of your private instances from your public instance as a bashing host you will need to use
+# ssh -a  to forward the key agent or you will need to copy the private key to your host , ] )
 
 resource "aws_key_pair" "skies_auth" {
   key_name = "${var.key_name}"
@@ -480,115 +484,125 @@ EOT
 }
 
 
+#--------------Lunch configuration----------------
 
-#dev record to point to the dev server public IP address 
-
-resource "aws_route53_record" "dev" { 
-  zone_id = "${aws_route53_zone.primary.zone.id}"
-  name= "dev.${var.domain_name}.com"
-  type = "A"
-  ttl = "300"
-  records = ["$aws_instance.dev.public.ip"]
-}
-
-
-#Key Pair 
-# so what this is doing is importing the content of the public key file uploading them to amazone and creating a new key based on this information 
-#(Note: this will not upload the private key to your instances only the public so if yopu need to connect to one of your private instances from your public instance as a bashing host you will need to use
-# ssh -a  to forward the key agent or you will need to copy the private key to your host , ] )
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-#Lunch configuration
-
-resource  "aws_lunch_configuration"  "lc" {
-  name_prefix = "lc"
-  image_id = "${aws_aim_from_instance.golden.id}"
+resource  "aws_lunch_configuration"  "skies_lc" {
+  name_prefix = "skies_lc-"
+  image_id = "${aws_aim_from_instance.skies_gold.id}"
   instance_type = "${var.lc_instance_type}"
-  security_groups = ["${aws_security_group.private.id}"]
-  iam_instance_profile = "${aws_aim_instance_profile.s3_access.id}"
-  key_name = "${file("userdata")}"
+  security_groups = ["${aws_security_group.skies_private_sg.id}"]
+  iam_instance_profile = "${aws_aim_instance_profile.s3_access_profile.id}"
+  key_name =  "${aws_key_pair.skies_auth.id}"
+  user_data = "${file("userdata")}"
   lifecycle = {
     create_before_destory = true
-
   }
 }
 
+# ------------------Auto scaling group------------------------
 
-# Auto scaling group
-
-resource "aws_autoscaling_group" "asg" {
+resource "aws_autoscaling_group" "skies_asg" {
   availability_zones = ["${var.aws_region}a", "${var.aws_region}c"]
   name = "asg-${aws_lunch_configuration.lc.id}"
   max_size = "${var.asg_max}"
   min_size = "${var.asg_min}"
   health_check_grace_period = "{var.asg_grace}"
-  health_check_type = "${var.asg_cap}"
-  force_delete =true
-  load_balancers = ["aws_elb.prod.id"]
-  vpc_zone_identifier = ["${aws_subnet.private.id}" ,"${aws_subnet.private2.id}" ]
-  lunch_configuration = "${aws_lunch_configuration.lc.name}"
+  health_check_type = "${var.asg_hct}"
+  desired_capacity = "${var.asg_cap}"
+  force_delete = true
+  load_balancers = ["${aws_elb.skies_elb.id}"]
+  vpc_zone_identifier = ["${aws_subnet.skies_private1_subnet.id}" ,"${aws_subnet.skies_private2_subnet.id}"]
+  lunch_configuration = "${aws_lunch_configuration.skies_lc.name}"
   tags{
     key = "Name"
-    value = "asg-instance"
+    value = "Sky_asg-instance"
     propagate_at_launch = true
   }
-  lifescycle{
+  lifescycle {
     create_before_destory = true
   }
   
 }
 
 
-# Route53 
+
+# ----------------Route53 --------------------
 
 # primary zone : use deligation set 
-resource " aws_route53" "primary" {
+resource " aws_route53_zone" "primary" {
   name = "${var.domain_name}.co.uk"
   delegation_set_id = "{var.delegation_set}"
 }
-#www point to load balancer 
-
+#-------------------www point to load balancer-------------------
 resource "aws_route53_record" "www" {
   zone_id ="${aws_route53_zone.primary.zone_id}"
   name = "www.${var.domain_name}.co.uk"
   type = "A"
   alias {
-    name =  "${aws_elb.prod.dns_name}"
-    zone_id = "${aws_elb.prod.zone_id}"
+    name =  "${aws_elb.skies_elb.dns_name}"
+    zone_id = "${aws_elb.skies_elb.zone_id}"
     evaluate_target_health = false
 
   }
   
 }
 
+#------------------dev route53-record to point to the dev server public IP address -------------------
 
-#db cname for RDS < allow web server to point to the RDs even if the IP changes 
+resource "aws_route53_record" "dev" { 
+  zone_id = "${aws_route53_zone.primary.zone.id}"
+  name= "dev.${var.domain_name}.co.uk"
+  type = "A"
+  ttl = "300"
+  records = ["${aws_instance.skies_dev.public.ip}"]
+}
 
+#-------------------Private zone----------------------------
+
+resource "aws_route53_zone" "secondary" {
+  name = "${var.domain_name}.co.uk"
+  vpc_id = "${aws_vpc.skies_vpc.id}"
+}
+
+#---------------------------DB---------------
 resource "aws_route53" "db" {
-  zone_id = "${aws_route53_zone.primary.zone_id}"
+  zone_id = "${aws_route53_zone.secondary.zone_id}"
   name = "db.${var.domain_name}.co.uk"
   type = "CNAME"
   ttl = "300"
   records = ["${aws_db_instance.db.address}"]
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ansible playbook
